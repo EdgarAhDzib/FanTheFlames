@@ -16,7 +16,10 @@ $.getJSON("/headlines", function(data) {
 });
 
 // Get the JSON from the comments collection
-$.getJSON("/comments", function(data) {
+$.getJSON("/comments", displayComments);
+
+function displayComments(data) {
+	console.log(data);
 	for (var i=0; i<data.length; i++) {
 
 		//Populate each created DIV with the comment body text, which will be matched to the comment ID previously assigned
@@ -31,7 +34,7 @@ $.getJSON("/comments", function(data) {
 			$(this).remove();
 		}
 	});
-});
+}
 
 // Get the JSON from the users collection
 $.getJSON("/users", function(data) {
@@ -118,5 +121,6 @@ $(document).on("click", ".eraseComment", function(){
 			// Value from clicked button
 			id: splicedVal
 		}
-	});
+	})
+	.done(displayComments);
 });

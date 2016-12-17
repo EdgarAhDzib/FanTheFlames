@@ -6,3 +6,7 @@ body {
 button {
 	color: black;
 }
+
+input, textarea {
+	color: black;
+}

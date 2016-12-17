@@ -12,6 +12,17 @@ var Comment = require("./models/Comment.js");
 var User = require("./models/User.js");
 var Feed = require("./models/Feed.js");
 
+//Import Mongo keys
+var Keys = require("./keys.js");
+
+//Establish the Mongo connection
+const creds = `${Keys.mongo.username}:${Keys.mongo.password}@`;
+const mongoSuffix = `${Keys.mongo.hostname}:${Keys.mongo.port}/${Keys.mongo.database}`;
+const connString = creds.length > 2 ? 'mongodb://' + creds + mongoSuffix : 'mongodb://' + mongoSuffix;
+
+const mongoConnection = connString;
+const PORT = process.env.PORT || 3000;
+
 // Mongoose mpromise deprecated - use bluebird promises
 var Promise = require("bluebird");
 mongoose.Promise = Promise;
@@ -20,13 +31,16 @@ mongoose.Promise = Promise;
 var app = express();
 
 // Use morgan and body parser with our app
-app.use(logger("dev"));
+//app.use(logger("dev"));
+app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
 	extended: false
 }));
+app.use(bodyParser.text());
+app.use(bodyParser.json({ type: "application/vnd.api+json" }));
 
 // Make public a static dir
-app.use(express.static("./public"));
+app.use(express.static("./public", {index: false} ) );
 
 // Database configuration with mongoose
 mongoose.connect("mongodb://localhost/newsfeeddb");
@@ -42,13 +56,6 @@ db.once("open", function() {
 	console.log("Mongoose connection successful.");
 });
 
-/*
-app.get('/', function(req,response){
-	response.sendFile(__dirname + "/public/index.html");;
-})
-*/
-
-//This route should be the default '/current', but redirect isn't working
 app.get('/', function(req, response) {
 
 	request("http://www.foxnews.com", function(error, response, html) {
@@ -175,22 +182,21 @@ app.post("/headlines/:id", function(req, response) {
 	// Retrieve the user name, pass this to User model to check before saving
 
 	var newComment = new Comment(req.body);
-	//var newUser = new User(req.body);
-	//This is throwing errors, find another way to get the name from this
+
 	var userName = req.body.name;
-	//var passWord = req.body.password;
 	console.log(userName);
 
 	//Create new User if the name doesn't already exist
 	User.count({name: userName}, function(err,count) {
 		if (err) throw err;
+		console.log(count);
 		if (count < 1) {
 
 			// Create a new user by using the User model as a class
 			// The "unique" rule in the User model's schema will prevent duplicate users from being added to the server
 			var Author = new User({
 				name: userName,
-				comments: req.body.body
+				comments: [newComment]
 			});
 			// Using the save method in mongoose, create user in db
 			Author.save(function(error, doc) {
@@ -215,8 +221,6 @@ app.post("/headlines/:id", function(req, response) {
 		// Otherwise
 		else {
 			// Use the article id to find and add its note
-
-			//This is working, the comments are getting associated with the articles, now to link with User
 			
 			Feed.findOneAndUpdate({ "_id": req.params.id }, { $push: { "comments": doc._id } }, {new: true})
 			// Execute the above query
@@ -247,31 +251,31 @@ app.post("/headlines/:id", function(req, response) {
 		}
 		response.redirect('/');
 	}); //Closes the whole SAVE function
-	//response.redirect('/');
 
 });
 
 //Delete a selected comment by its ID
 app.post('/delete/:id', function(request, response){
 	var currId = request.params.id;
-
-	Comment.find({ _id : currId }).remove().exec();
-	User.update( {}, {$unset: {comments: currId} });
-	Feed.update( {}, {$unset: {comments: currId} }, function(err, newdoc){
-		if (err) {
-			response.send(err);
-		} else {
-			response.send(newdoc);
-		}
+	Comment.remove({ _id: currId }, function(err, data) {
+		// TODO: Unset with user
+		// TODO: Unset with feed
+		// TODO: Send the updated comments
+		User.update( {}, {$unset: {comments: currId} }, function(err, data) {
+			Feed.update( {}, {$unset: {comments: currId} }, function(err, data) {
+				Comment.find({}, function(err, data) {
+				if (err) {
+					throw err;
+				} else {
+					response.json(data);
+				}
+				})
+			})
+		})
 	});
-	//also findOneAndUpdate for Feed and User models
-//db.books.update( { _id: 1 }, { $unset: { tags: 1 } } )
-//{ $unset: { <field1>: "", ... } }
-
-//User.update({_id: user._id}, {$unset: {field: 1 }}, callback);
 });
 
-// Listen on Port 8080
-app.listen(8080, function() {
-	console.log("App running on port 8080!");
+// Listen on Port 3000
+app.listen(3000, function() {
+	console.log("App running on port 3000!");
 });
